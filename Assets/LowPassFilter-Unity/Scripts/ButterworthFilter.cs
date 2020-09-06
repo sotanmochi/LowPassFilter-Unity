@@ -15,11 +15,18 @@ namespace LowPassFilter
         double[] a; // Coefficient
         double[] b; // Coefficient
 
+        /// <summary>
+        /// Create a Butterworth filter
+        /// </summary>
+        /// <param name="order"></param>
+        /// <param name="fs">Sampling frequency [Hz]</param>
+        /// <param name="fc">Cutoff frequency [Hz]</param>
+        /// <param name="vectorSize">Vector data size</param>
         public ButterworthFilter(uint order, double fs, double fc, uint vectorSize = 1)
         {
             _VectorSize = vectorSize;
 
-            N = Math.Min(order, 2);
+            N = Math.Min(order, 3);
             N = Math.Max(order, 1);
 
             xk = new double[(N + 1), vectorSize];
@@ -66,6 +73,20 @@ namespace LowPassFilter
                 // UnityEngine.Debug.Log("a[2]: " + a[2]);
                 // UnityEngine.Debug.Log("**************************");
             }
+            else if (N == 3)
+            {
+                double temp = 1.0 + 2.0*fa + 2.0*fa*fa + fa*fa*fa;
+
+                b[0] = 1;
+                b[1] = (-3.0 - 2.0*fa + 2.0*fa*fa + 3.0*fa*fa*fa) / temp;
+                b[2] = ( 3.0 - 2.0*fa - 2.0*fa*fa + 3.0*fa*fa*fa) / temp;
+                b[3] = (-1.0 + 2.0*fa - 2.0*fa*fa + 1.0*fa*fa*fa) / temp;
+
+                a[0] = (1.0*fa*fa*fa) / temp;
+                a[1] = (3.0*fa*fa*fa) / temp;
+                a[2] = (3.0*fa*fa*fa) / temp;
+                a[3] = (1.0*fa*fa*fa) / temp;
+            }
         }
 
         public bool Init(in float[] input)
@@ -89,6 +110,18 @@ namespace LowPassFilter
                 {
                     xk[2,m] = input[m]; // x[k - 2]
                     xk[1,m] = input[m]; // x[k - 1]
+                    yk[2,m] = input[m]; // y[k - 2]
+                    yk[1,m] = input[m]; // y[k - 1]
+                }
+            }
+            else if (N == 3)
+            {
+                for (int m = 0; m < input.Length; m++)
+                {
+                    xk[3,m] = input[m]; // x[k - 3]
+                    xk[2,m] = input[m]; // x[k - 2]
+                    xk[1,m] = input[m]; // x[k - 1]
+                    yk[3,m] = input[m]; // y[k - 3]
                     yk[2,m] = input[m]; // y[k - 2]
                     yk[1,m] = input[m]; // y[k - 1]
                 }
@@ -131,14 +164,40 @@ namespace LowPassFilter
                 }
                 for (int m = 0; m < input.Length; m++)
                 {
-                    // y[k] = (a0*x[k] + a1*x[k - 1] + a2*x[k - 2]) - (b1*y[k - 1] + b2*y[k - 2])
-                    yk[0,m] = (float)(a[0]*xk[0,m] + a[1]*xk[1,m] + a[2]*xk[2,m] - b[1]*yk[1,m] - b[2]*yk[2,m]);
+                    // y[k] = (a0*x[k] + a1*x[k - 1] + a2*x[k - 2]) 
+                    //                 -(b1*y[k - 1] + b2*y[k - 2])
+                    yk[0,m] = (float)(a[0]*xk[0,m] + a[1]*xk[1,m] + a[2]*xk[2,m]
+                                                   - b[1]*yk[1,m] - b[2]*yk[2,m]);
                 }
                 for (int m = 0; m < output.Length; m++)
                 {
                     output[m] = (float)yk[0,m];
                     xk[2,m] = xk[1,m]; // x[k - 2] <- x[k - 1]
                     xk[1,m] = xk[0,m]; // x[k - 1] <- x[k]
+                    yk[2,m] = yk[1,m]; // y[k - 2] <- y[k - 1]
+                    yk[1,m] = yk[0,m]; // y[k - 1] <- y[k]
+                }
+            }
+            else if (N == 3)
+            {
+                for (int m = 0; m < input.Length; m++)
+                {
+                    xk[0,m] = input[m];
+                }
+                for (int m = 0; m < input.Length; m++)
+                {
+                    // y[k] = (a0*x[k] + a1*x[k - 1] + a2*x[k - 2] + a3*x[k - 3])
+                    //                 -(b1*y[k - 1] + b2*y[k - 2] + b3*y[k - 3])
+                    yk[0,m] = (float)(a[0]*xk[0,m] + a[1]*xk[1,m] + a[2]*xk[2,m] + a[3]*xk[3,m]
+                                                   - b[1]*yk[1,m] - b[2]*yk[2,m] - b[3]*yk[3,m]);
+                }
+                for (int m = 0; m < output.Length; m++)
+                {
+                    output[m] = (float)yk[0,m];
+                    xk[3,m] = xk[2,m]; // x[k - 3] <- x[k - 2]
+                    xk[2,m] = xk[1,m]; // x[k - 2] <- x[k - 1]
+                    xk[1,m] = xk[0,m]; // x[k - 1] <- x[k]
+                    yk[3,m] = yk[2,m]; // y[k - 3] <- y[k - 2]
                     yk[2,m] = yk[1,m]; // y[k - 2] <- y[k - 1]
                     yk[1,m] = yk[0,m]; // y[k - 1] <- y[k]
                 }
