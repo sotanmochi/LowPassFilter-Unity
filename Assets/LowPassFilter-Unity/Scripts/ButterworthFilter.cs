@@ -26,7 +26,7 @@ namespace LowPassFilter
         {
             _VectorSize = vectorSize;
 
-            N = Math.Min(order, 3);
+            N = Math.Min(order, 4);
             N = Math.Max(order, 1);
 
             xk = new double[(N + 1), vectorSize];
@@ -87,6 +87,24 @@ namespace LowPassFilter
                 a[2] = (3.0*fa*fa*fa) / temp;
                 a[3] = (1.0*fa*fa*fa) / temp;
             }
+            else if (N == 4)
+            {
+                double alpha = 2.0*Math.Cos(5.0/8.0*Math.PI) + 2.0*Math.Cos(7.0/8.0*Math.PI);
+                double beta = 2.0 + 2.0/sqrt2;
+                double temp = fa*fa*fa*fa - alpha*fa*fa*fa + beta*fa*fa - alpha*fa + 1.0;
+
+                b[0] = 1;
+                b[1] = (4.0*fa*fa*fa*fa - 2.0*alpha*fa*fa*fa + 2.0*alpha*fa - 4.0) / temp;
+                b[2] = (6.0*fa*fa*fa*fa - 2.0*beta*fa*fa + 6.0) / temp;
+                b[3] = (4.0*fa*fa*fa*fa + 2.0*alpha*fa*fa*fa - 2.0*alpha*fa - 4.0) / temp;
+                b[4] = (1.0*fa*fa*fa*fa + alpha*fa*fa*fa + beta*fa*fa + alpha*fa + 1.0) / temp;
+
+                a[0] = (1.0*fa*fa*fa*fa) / temp;
+                a[1] = (4.0*fa*fa*fa*fa) / temp;
+                a[2] = (6.0*fa*fa*fa*fa) / temp;
+                a[3] = (4.0*fa*fa*fa*fa) / temp;
+                a[4] = (1.0*fa*fa*fa*fa) / temp;
+            }
         }
 
         public bool Init(in float[] input)
@@ -121,6 +139,20 @@ namespace LowPassFilter
                     xk[3,m] = input[m]; // x[k - 3]
                     xk[2,m] = input[m]; // x[k - 2]
                     xk[1,m] = input[m]; // x[k - 1]
+                    yk[3,m] = input[m]; // y[k - 3]
+                    yk[2,m] = input[m]; // y[k - 2]
+                    yk[1,m] = input[m]; // y[k - 1]
+                }
+            }
+            else if (N == 4)
+            {
+                for (int m = 0; m < input.Length; m++)
+                {
+                    xk[4,m] = input[m]; // x[k - 4]
+                    xk[3,m] = input[m]; // x[k - 3]
+                    xk[2,m] = input[m]; // x[k - 2]
+                    xk[1,m] = input[m]; // x[k - 1]
+                    yk[4,m] = input[m]; // y[k - 4]
                     yk[3,m] = input[m]; // y[k - 3]
                     yk[2,m] = input[m]; // y[k - 2]
                     yk[1,m] = input[m]; // y[k - 1]
@@ -197,6 +229,32 @@ namespace LowPassFilter
                     xk[3,m] = xk[2,m]; // x[k - 3] <- x[k - 2]
                     xk[2,m] = xk[1,m]; // x[k - 2] <- x[k - 1]
                     xk[1,m] = xk[0,m]; // x[k - 1] <- x[k]
+                    yk[3,m] = yk[2,m]; // y[k - 3] <- y[k - 2]
+                    yk[2,m] = yk[1,m]; // y[k - 2] <- y[k - 1]
+                    yk[1,m] = yk[0,m]; // y[k - 1] <- y[k]
+                }
+            }
+            else if (N == 4)
+            {
+                for (int m = 0; m < input.Length; m++)
+                {
+                    xk[0,m] = input[m];
+                }
+                for (int m = 0; m < input.Length; m++)
+                {
+                    // y[k] = (a0*x[k] + a1*x[k - 1] + a2*x[k - 2] + a3*x[k - 3] + a4*x[k - 4])
+                    //                 -(b1*y[k - 1] + b2*y[k - 2] + b3*y[k - 3] + b4*y[k - 4])
+                    yk[0,m] = (float)(a[0]*xk[0,m] + a[1]*xk[1,m] + a[2]*xk[2,m] + a[3]*xk[3,m] + a[4]*xk[4,m]
+                                                   - b[1]*yk[1,m] - b[2]*yk[2,m] - b[3]*yk[3,m] - b[4]*yk[4,m]);
+                }
+                for (int m = 0; m < output.Length; m++)
+                {
+                    output[m] = (float)yk[0,m];
+                    xk[4,m] = xk[3,m]; // x[k - 4] <- x[k - 3]
+                    xk[3,m] = xk[2,m]; // x[k - 3] <- x[k - 2]
+                    xk[2,m] = xk[1,m]; // x[k - 2] <- x[k - 1]
+                    xk[1,m] = xk[0,m]; // x[k - 1] <- x[k]
+                    yk[4,m] = yk[3,m]; // y[k - 4] <- y[k - 3]
                     yk[3,m] = yk[2,m]; // y[k - 3] <- y[k - 2]
                     yk[2,m] = yk[1,m]; // y[k - 2] <- y[k - 1]
                     yk[1,m] = yk[0,m]; // y[k - 1] <- y[k]
